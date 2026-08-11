@@ -1,11 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Multi-Agent AI",
-  description:
-    "Live prototype of a multi-agent AI OS with shared organizational memory.",
+  title: "HR Assistant",
+  description: "assistants that share the same notes.",
 };
-
 export default function RootLayout({ children }) {
   return (
     <html lang="en">

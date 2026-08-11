@@ -3,43 +3,39 @@
 import { useState, useRef, useEffect } from "react";
 
 const AGENTS = {
-  ava: {
-    name: "Ava",
-    role: "Executive Assistant",
+  assistant: {
+    name: "Assistant",
+    role: "General",
     color: "#ffa94d",
     bg: "#3a2a12",
     system:
-      "You are Ava, the Executive Assistant agent inside a multi-agent business AI OS. You handle scheduling, prioritization, cross-department coordination, and daily briefings. You have access to a shared organizational memory log written by other agents (Sales, Ops). Be sharp, concise, and executive in tone — 2-4 sentences max unless asked for a briefing. When relevant, reference specific items from the memory log to prove you have shared context.",
+      "You are the general HR assistant in a small internal tool. You handle meetings, schedules, and general questions. You can see notes left by the Attendance and Appraisals assistants. Answer in 2-4 plain sentences, no corporate language, just answer like a helpful coworker would in a chat message. Reference specific notes if they're relevant to the question — but don't pull in names from unrelated notes just because they're the most recent. Never say you'll check and get back later, never defer — always give a direct, specific answer right now, even for general company facts (like headcount or team size). Make up a plausible, specific number or detail if none is given, and stay consistent with it only if asked the same thing again.",
   },
-  rex: {
-    name: "Rex",
-    role: "Sales Agent",
+  attendance: {
+    name: "Attendance",
+    role: "Leave & attendance",
     color: "#4fd1c5",
     bg: "#0f2e2b",
     system:
-      "You are Rex, the Sales agent inside a multi-agent business AI OS (real estate / construction / mortgage business). You handle leads, follow-ups, deal status, and CRM-style updates. You have access to a shared organizational memory log written by other agents (Executive Assistant, Ops). Be concise and concrete — 2-4 sentences. Invent plausible small business details (lead names, deal stages) consistent with prior memory if present.",
+      "You handle leave and attendance questions in a small internal HR tool. You can see notes left by the general Assistant and the Appraisals assistant. Answer in 2-4 plain sentences, no corporate language. Never say you'll check and get back later — always give a direct, specific answer right now. Make up realistic but simple details (names, dates, counts) if none are given. Only reuse a name from an earlier note if the question is actually about that same person or event — for a new, unrelated question, invent a fresh name instead of reusing whoever was mentioned last.",
   },
-  nova: {
-    name: "Nova",
-    role: "Construction Ops",
+  appraisals: {
+    name: "Appraisals",
+    role: "Performance reviews",
     color: "#b39ddb",
     bg: "#241a35",
     system:
-      "You are Nova, the Construction Ops agent inside a multi-agent business AI OS. You handle site status, permits, subcontractor schedules, and project timelines. You have access to a shared organizational memory log written by other agents (Executive Assistant, Sales). Be concise and concrete — 2-4 sentences. Invent plausible small business details (site names, permit stages) consistent with prior memory if present.",
+      "You handle performance reviews and appraisals in a small internal HR tool. You can see notes left by the general Assistant and the Attendance assistant. Answer in 2-4 plain sentences, no corporate language. Never say you'll check and get back later — always give a direct, specific answer right now. Make up realistic but simple details (names, review stage, counts) if none are given. Only reuse a name from an earlier note if the question is actually about that same person or event — for a new, unrelated question, invent a fresh name instead of reusing whoever was mentioned last.",
   },
 };
 
 function pickAgent(text) {
   const t = text.toLowerCase();
-  if (/(lead|deal|client|sale|follow up|followup|pitch|offer|buyer)/.test(t))
-    return "rex";
-  if (
-    /(site|permit|construction|contractor|build|schedule|inspection|project)/.test(
-      t,
-    )
-  )
-    return "nova";
-  return "ava";
+  if (/(leave|off|absent|attendance|pto|vacation|out of office|sick)/.test(t))
+    return "attendance";
+  if (/(appraisal|performance|review|promotion|rating|increment)/.test(t))
+    return "appraisals";
+  return "assistant";
 }
 
 async function callAgent(system, prompt, agentKey, memoryLines) {
@@ -78,11 +74,11 @@ export default function Page() {
     setActiveAgent(agentKey);
 
     const memoryContext = memory.length
-      ? "Shared memory log so far:\n" +
+      ? "Notes so far:\n" +
         memory.map((m) => `- [${AGENTS[m.agent].name}] ${m.text}`).join("\n")
-      : "Shared memory log is currently empty.";
+      : "No notes yet.";
 
-    const prompt = `${memoryContext}\n\nNew task from the business owner: "${text}"\n\nRespond as yourself, and keep it short.`;
+    const prompt = `${memoryContext}\n\nNew question: "${text}"\n\nAnswer as yourself, keep it short.`;
 
     try {
       const memoryLines = memory.map(
@@ -96,11 +92,7 @@ export default function Page() {
       );
       setMessages((m) => [
         ...m,
-        {
-          who: `${AGENTS[agentKey].name} · ${AGENTS[agentKey].role}`,
-          text: reply,
-          cls: "agent",
-        },
+        { who: AGENTS[agentKey].name, text: reply, cls: "agent" },
       ]);
       setMemory((mem) => [
         ...mem,
@@ -124,30 +116,24 @@ export default function Page() {
   async function generateBriefing() {
     setBriefingBusy(true);
     const memoryContext = memory.length
-      ? memory
-          .map(
-            (m) =>
-              `- [${AGENTS[m.agent].name} / ${AGENTS[m.agent].role}] ${m.text}`,
-          )
-          .join("\n")
-      : "No activity logged yet in this session.";
+      ? memory.map((m) => `- [${AGENTS[m.agent].name}] ${m.text}`).join("\n")
+      : "No notes yet.";
 
-    const prompt = `Here is everything logged in shared organizational memory today:\n${memoryContext}\n\nWrite a short executive daily briefing (4-6 lines, plain text, no markdown headers) for the business owner, synthesizing across departments. If memory is empty, note that no activity has been logged yet and briefly describe what a briefing will look like once agents start working.`;
+    const prompt = `Here are today's notes:\n${memoryContext}\n\nWrite a short summary (4-6 plain sentences, no headers, no corporate language) covering attendance and appraisals. If there are no notes yet, just say so simply.`;
 
     try {
       const memoryLines = memory.map(
-        (m) =>
-          `- [${AGENTS[m.agent].name} / ${AGENTS[m.agent].role}] ${m.text}`,
+        (m) => `- [${AGENTS[m.agent].name}] ${m.text}`,
       );
       const text = await callAgent(
-        AGENTS.ava.system,
+        AGENTS.assistant.system,
         prompt,
         "briefing",
         memoryLines,
       );
       setBriefing(text);
     } catch (e) {
-      setBriefing("Error generating briefing: " + e.message);
+      setBriefing("Error generating summary: " + e.message);
     }
     setBriefingBusy(false);
   }
@@ -158,8 +144,10 @@ export default function Page() {
         <div className="brand">
           <div className="dot" />
           <div>
-            <h1>COMMAND DECK</h1>
-            <div className="sub">multi-agent AI OS — architecture</div>
+            <h1>HR Assistant</h1>
+            <div className="sub">
+              demo — a few assistants sharing the same notes
+            </div>
           </div>
         </div>
         <button
@@ -167,14 +155,14 @@ export default function Page() {
           onClick={generateBriefing}
           disabled={briefingBusy}
         >
-          {briefingBusy ? "Generating…" : "Generate Daily Briefing"}
+          {briefingBusy ? "Working…" : "Today's Summary"}
         </button>
       </header>
 
       <div className="grid">
         {/* Roster */}
         <div className="panel">
-          <h2>Agent Roster</h2>
+          <h2>Team</h2>
           {Object.entries(AGENTS).map(([key, a]) => (
             <div
               key={key}
@@ -192,20 +180,20 @@ export default function Page() {
                 <div
                   className={`status ${activeAgent === key ? "working" : "idle"}`}
                 >
-                  {activeAgent === key ? "● working" : "○ idle"}
+                  {activeAgent === key ? "● answering" : "○ idle"}
                 </div>
               </div>
             </div>
           ))}
           <div className="hint" style={{ marginTop: 14 }}>
-            Each agent reads &amp; writes to the same memory feed on the right —
-            that&apos;s the &quot;org memory&quot; layer.
+            They all read and write the same notes on the right, so nothing gets
+            lost between them.
           </div>
         </div>
 
         {/* Chat */}
         <div className="panel">
-          <h2>Task Console</h2>
+          <h2>Chat</h2>
           <div className="chatlog" ref={logRef}>
             {messages.map((m, i) => (
               <div key={i} className={`msg ${m.cls}`}>
@@ -219,7 +207,7 @@ export default function Page() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-              placeholder="Type a task, e.g. 'follow up with the Miller lead'"
+              placeholder="Ask something, e.g. 'who is on leave today?'"
             />
             <button onClick={() => sendMessage()} disabled={busy}>
               Send
@@ -228,43 +216,37 @@ export default function Page() {
           <div style={{ marginTop: 10 }}>
             <span
               className="chip"
-              onClick={() =>
-                sendMessage(
-                  "Follow up with the Miller lead about the site visit",
-                )
-              }
+              onClick={() => sendMessage("Who is on leave today?")}
             >
-              follow up w/ Miller lead
+              who's on leave today
             </span>
             <span
               className="chip"
               onClick={() =>
-                sendMessage("Whats the status on the Riverside site permits?")
+                sendMessage("What's the status of the appraisals?")
               }
             >
-              Riverside permit status
+              appraisal status
             </span>
             <span
               className="chip"
-              onClick={() =>
-                sendMessage("Summarize what happened today across the business")
-              }
+              onClick={() => sendMessage("Sum up what happened today")}
             >
-              summarize today
+              sum up today
             </span>
           </div>
           <div className="hint">
-            Try one task, then generate the briefing — notice it references what
-            the agents just logged.
+            Ask one question, then check the summary — it uses what the others
+            just answered.
           </div>
         </div>
 
         {/* Memory */}
         <div className="panel">
-          <h2>Shared Organizational Memory</h2>
+          <h2>Notes</h2>
           {memory.length === 0 ? (
             <div className="mem-empty">
-              // empty — agents will write here as tasks run
+              nothing here yet — answers will show up as notes
             </div>
           ) : (
             [...memory].reverse().map((m, i) => {
@@ -290,14 +272,17 @@ export default function Page() {
           )}
           {briefing && (
             <div className="briefing">
-              <div className="briefing-label">Ava — Daily Briefing</div>
+              <div className="briefing-label">Summary</div>
               {briefing}
             </div>
           )}
         </div>
       </div>
 
-      <footer>3 agents shown to prove the pattern</footer>
+      <footer>
+        Just a small demo — 3 assistants, to show how they can share notes and
+        answer together.
+      </footer>
     </div>
   );
 }

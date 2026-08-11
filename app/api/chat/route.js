@@ -5,37 +5,33 @@
 // Switch to MOCK_MODE=false (or remove it) only when you're ready to demo
 // with the real model.
 const MOCK_REPLIES = {
-  ava: [
-    "Got it — I've noted that for your schedule. Based on what's in the shared log, I'd suggest tackling the Riverside permit follow-up before end of day since Nova flagged it as time-sensitive.",
-    "Noted and logged. Nothing else urgent is queued from Sales or Ops right now, so this is a good window to knock it out.",
+  assistant: [
+    "Noted. Nothing else is pending from Attendance or Appraisals right now, so today looks clear.",
+    "Got it, I've added that to the notes.",
   ],
-  rex: [
-    "Logged. The Miller lead is currently at 'site visit scheduled' stage — I've queued a follow-up call for tomorrow morning and will update the deal status once we hear back.",
-    "On it — I'll follow up with them today and flag it back to Ava if it needs to move up the priority list.",
+  attendance: [
+    "Two people are off today, both back tomorrow. No issues with today's meetings.",
+    "Noted — I'll mention it to the others if it affects anything this week.",
   ],
-  nova: [
-    "Riverside site permits are currently under county review — expected clearance in 3-4 business days. Subcontractor schedule is holding for now, no blockers to report.",
-    "Checked the timeline — inspection is booked for Thursday, no conflicts with the current build schedule.",
+  appraisals: [
+    "Most reviews are done, a couple are still waiting on manager feedback, should be in by Friday.",
+    "Checked — a few appraisals are still pending, I've sent a reminder.",
   ],
 };
 
 function mockReply(agentKey, memoryLen) {
-  const options = MOCK_REPLIES[agentKey] || MOCK_REPLIES.ava;
+  const options = MOCK_REPLIES[agentKey] || MOCK_REPLIES.assistant;
   return options[memoryLen % options.length];
 }
 
 function mockBriefing(memory) {
   if (!memory || memory.length === 0) {
-    return "No activity has been logged yet today. Once agents start handling tasks, this briefing will summarize what happened across Sales, Ops, and your schedule — in a few short lines, every morning.";
+    return "No notes yet today. Once questions come in, this summary will pull together what's happened across attendance and appraisals.";
   }
   const items = memory
     .map((line) => line.replace(/^- \[.*?\]\s*/, ""))
     .slice(0, 4);
-  return (
-    "Here's where things stand: " +
-    items.join(" ") +
-    " Nothing urgent is blocked — happy to go deeper on any of these."
-  );
+  return "Here's what's up: " + items.join(" ") + " Nothing urgent pending.";
 }
 // --- END MOCK MODE ---
 
@@ -50,7 +46,7 @@ export async function POST(req) {
         return Response.json({ text: mockBriefing(memory || []) });
       }
       return Response.json({
-        text: mockReply(agentKey || "ava", (memory || []).length),
+        text: mockReply(agentKey || "assistant", (memory || []).length),
       });
     }
 
